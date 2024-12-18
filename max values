@@ -1,0 +1,47 @@
+!pip install --upgrade yfinance
+
+import pandas as pd
+import yfinance as yf
+
+# Шаг 1: Загрузка исходного файла с данными о компаниях NASDAQ
+input_file = '/kaggle/input/nasdaq/nasdaq_screener_1734427367061.csv'
+output_file = 'nasdaq_max_historical_updated.xlsx'
+
+# Чтение данных из CSV
+nasdaq_df = pd.read_csv(input_file)
+
+# Проверяем, есть ли колонка "Symbol" для тикеров
+if 'Symbol' not in nasdaq_df.columns:
+    raise ValueError("В файле нет колонки 'Symbol', необходимой для загрузки данных.")
+
+# Создаем новый DataFrame для хранения максимальных значений
+max_values = []
+
+# Шаг 2: Получение исторических данных по каждому символу
+for ticker in nasdaq_df['Symbol']:
+    try:
+        print(f"Загружаем данные для {ticker}...")
+        data = yf.download(ticker, start="1990-01-01", end="2024-12-31", progress=False)
+        
+        # Рассчитываем максимальные значения по годам
+        data['Year'] = data.index.year
+        yearly_max = data.groupby('Year')['High'].max().reset_index()
+        yearly_max.columns = ['Year', 'Max_High']
+        
+        # Добавляем тикер для идентификации
+        yearly_max['Symbol'] = ticker
+        max_values.append(yearly_max)
+    except Exception as e:
+        print(f"Ошибка при загрузке данных для {ticker}: {e}")
+        continue
+
+# Объединяем данные по всем тикерам
+max_values_df = pd.concat(max_values, ignore_index=True)
+
+# Шаг 3: Добавляем полученные данные в конец исходного файла
+with pd.ExcelWriter(output_file, engine='openpyxl', mode='w') as writer:
+    nasdaq_df.to_excel(writer, index=False, sheet_name='Company_Info')
+    max_values_df.to_excel(writer, index=False, sheet_name='Max_Historical_Highs')
+
+print(f"Файл успешно обновлен и сохранен как '{output_file}'.")
+ 
