@@ -1,0 +1,48 @@
+import pandas as pd
+import yfinance as yf
+
+# Шаг 1: Загрузка исходного файла с компаниями NASDAQ
+input_file = '/kaggle/input/nasdaq/nasdaq_screener_1734427367061.csv'  # Путь к вашему файлу
+output_file = 'nasdaq_with_historical_data.xlsx'  # Выходной файл
+
+# Загружаем файл с компаниями NASDAQ
+companies_df = pd.read_csv(input_file)
+
+# Оставляем только нужные столбцы
+companies_df = companies_df[['Symbol', 'Name', 'Country', 'IPO Year', 'Sector', 'Industry']]
+
+# Шаг 2: Функция для получения цены на заданную дату
+def get_price_on_date(ticker, year, month=12, day=1):
+    try:
+        date = f"{year}-{month:02d}-{day:02d}"
+        stock = yf.Ticker(ticker)
+        data = stock.history(start=date, end=date)
+        if not data.empty:
+            return data['Close'].iloc[0]
+        else:
+            return None
+    except Exception as e:
+        print(f"Ошибка для {ticker} на {date}: {e}")
+        return None
+
+# Шаг 3: Формирование данных по годам
+years = list(range(1990, 2025))  # Укажите диапазон лет
+historical_data = []
+
+for index, row in companies_df.iterrows():
+    ticker = row['Symbol']
+    print(f"Обработка: {ticker} ({index + 1}/{len(companies_df)})")
+    company_data = {'Symbol': ticker, 'Name': row['Name'], 'Country': row['Country'],
+                    'IPO Year': row['IPO Year'], 'Sector': row['Sector'], 'Industry': row['Industry']}
+    
+    for year in years:
+        price = get_price_on_date(ticker, year)
+        company_data[year] = price
+    
+    historical_data.append(company_data)
+
+# Шаг 4: Сохранение результата в Excel
+result_df = pd.DataFrame(historical_data)
+result_df.to_excel(output_file, index=False)
+
+print(f"Файл успешно сохранен: {output_file}")
